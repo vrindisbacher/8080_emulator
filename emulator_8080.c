@@ -50,7 +50,7 @@ int Emulator(CPU8080 *cpu){
 		case 0x01: // LXI B, D16
 			cpu->c = op[1];
 			cpu->b = op[2];
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0x05:  // DCR B
 			cpu->b -= 1; 
@@ -61,7 +61,7 @@ int Emulator(CPU8080 *cpu){
 			break;
 		case 0x06: // MVI B, D8
 			cpu->b = op[1];
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0x09: // DAD B -- This means H and L iss HL + BC: ***Little Endian Computer***
 			hl = cpu->l | (cpu->h << 8);
@@ -81,7 +81,7 @@ int Emulator(CPU8080 *cpu){
 			break;
 		case 0x0e: // MVI C, D8 
 			cpu->c = op[1];
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0x0f: // RRC
 			uint8_t x = cpu->a;
@@ -91,7 +91,7 @@ int Emulator(CPU8080 *cpu){
 		case 0x11: // LXI D, D16 
 			cpu->e = op[1];
 			cpu->d = op[2];
-			cpu->counter ++;
+			cpu->counter += 3;
 			break;
 		case 0x13: // INX D
 			de = cpu->e | (cpu->d << 8);
@@ -125,7 +125,7 @@ int Emulator(CPU8080 *cpu){
 		case 0x21: // LXI H, D16 
 			cpu->l = op[1];
 			cpu->h = op[2];
-			cpu->counter ++;
+			cpu->counter += 3;
 			break;
 		case 0x23: // INX H 
 			hl = cpu->l | (cpu->h << 8);
@@ -144,7 +144,7 @@ int Emulator(CPU8080 *cpu){
 			
 		case 0x26: // MVI H D8 
 			cpu->h = op[1];
-			cpu->counter ++; 
+			cpu->counter += 2; 
 			break;
 		case 0x29: // DAD H 
 			hl = cpu->l | (cpu->h << 8);
@@ -157,25 +157,35 @@ int Emulator(CPU8080 *cpu){
 		case 0x31: // LXI SP D16 
 			ptr = op[1] | (op[2] << 8);
 			cpu->sp = ptr;
-			cpu->counter ++;
+			cpu->counter += 3;
 			break;
 		case 0x32: // STA adr;
 			address = op[1] | (op[2] << 8);
 			cpu->memory[address] = cpu->a;
-			cpu->counter ++;
+			cpu->counter += 3;
 			break; 
 		case 0x36: // MVI M, D8
 			hl = cpu->l | (cpu->h << 8);
 			cpu->memory[hl] = op[1];
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0x3a: // LDA adr 
 			address = (op[2] << 8) | op[1];
 			cpu->a = cpu->memory[address];
-			cpu->counter ++;
+			cpu->counter += 3;
 			break;
 		case 0x3e: // MVI A, D8 
 			cpu->a = op[1];
+			cpu->counter += 2;
+			break;
+		case 0x46: // MOV B,M
+			hl = cpu->l | (cpu->h << 8);
+			cpu->b = cpu->memory[hl];
+			cpu->counter ++;
+			break;
+		case 0x4e: // MOV C,M
+			hl = cpu->l | (cpu->h << 8);
+			cpu->c = cpu->memory[hl];
 			cpu->counter ++;
 			break;
 		case 0x56: // MOV D, M
@@ -188,6 +198,9 @@ int Emulator(CPU8080 *cpu){
 			cpu->e = cpu->memory[hl];
 			cpu->counter ++;
 			break;
+		case 0x61: // MOV H,C 
+			cpu->h = cpu->c;
+			cpu->counter ++;
 		case 0x66: // MOV H,M 
 			hl = cpu->l | (cpu->h << 8);
 			cpu->h = cpu->memory[hl];
@@ -276,7 +289,7 @@ int Emulator(CPU8080 *cpu){
 			cpu->cc.s = (0x80 == (x & 0x80));
 			cpu->cc.p = parity(x, 8);
 			cpu->cc.cy = (x > 0xff);
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0xc9: // RET 
 			cpu->counter = cpu->memory[cpu->sp] | (cpu->memory[cpu->sp + 1] << 8);
@@ -297,7 +310,7 @@ int Emulator(CPU8080 *cpu){
 			cpu->counter ++;
 			break;
 		case 0xd3: // OUT D8 
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0xd5: // PUSH D 
 			cpu->memory[cpu->sp - 2] = cpu->e; 
@@ -324,7 +337,7 @@ int Emulator(CPU8080 *cpu){
 			cpu->cc.s = (0x80 == (x & 0x80));
 			cpu->cc.p = parity(x, 8);
 			cpu->cc.cy = 0;
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;
 		case 0xeb: // XCHG 
 			uint8_t copy_h = cpu->h;
@@ -363,11 +376,11 @@ int Emulator(CPU8080 *cpu){
 			cpu->cc.s = (0x80 == (x & 0x80));
 			cpu->cc.p = parity(x, 8);
 			cpu->cc.cy = (cpu->a < op[1]);
-			cpu->counter ++;
+			cpu->counter += 2;
 			break;	
 		default:
 			printf("Not Implemented\n");
-			cpu->counter++;
+			exit(0);
 			break;
 	}
 	printf("\tC=%d,P=%d,S=%d,Z=%d\n", cpu->cc.cy, cpu->cc.p,    
@@ -688,8 +701,13 @@ int main(){
 	fread(buff, file_size, 1, file);
 	fclose(file);
 	
-	while (1){
+	int done = 0;
+	int instructions = 0;
+	while (!done){
 		Emulator(cpu);
+		instructions++;
+		if (instructions > 0x10000)
+			done = 1;
 	}
 	
 	
